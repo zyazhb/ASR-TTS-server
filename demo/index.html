@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice ASR / TTS Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-monospace, monospace;
+      font-size: 14px;
+      max-width: 480px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #111;
+      color: #eee;
+    }
+    h1 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    section { margin-bottom: 1.5rem; }
+    label { display: block; margin-bottom: 0.25rem; opacity: 0.8; }
+    input, textarea, button {
+      font-family: inherit;
+      font-size: inherit;
+      padding: 0.5rem;
+      border: 1px solid #333;
+      background: #1a1a1a;
+      color: #eee;
+    }
+    textarea { width: 100%; min-height: 80px; resize: vertical; }
+    input { width: 100%; }
+    button {
+      cursor: pointer;
+      margin-right: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>Voice ASR / TTS</h1>
+
+  <section>
+    <label>ASR (Speech-to-Text)</label>
+    <button id="start-asr">Start ASR</button>
+    <button id="stop-asr" disabled>Stop ASR</button>
+    <textarea id="asr-output" readonly placeholder="Transcription will appear here..."></textarea>
+  </section>
+
+  <section>
+    <label>TTS (Text-to-Speech)</label>
+    <input id="tts-input" type="text" placeholder="Enter text to speak..." />
+    <button id="speak">Speak</button>
+  </section>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

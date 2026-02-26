@@ -1,3 +1,25 @@
+## demo (ASR + TTS)
+
+1. Start sherpa-onnx WebSocket ASR server (for real ASR):
+```bash
+./sherpa-onnx-online-websocket-server \
+  --port=6006 \
+  --tokens=./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tokens.txt \
+  --encoder=./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/encoder-epoch-99-avg-1.onnx \
+  --decoder=./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/decoder-epoch-99-avg-1.onnx \
+  --joiner=./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/joiner-epoch-99-avg-1.onnx \
+  --num-threads=4
+```
+
+2. Build frontend and start Go server:
+```bash
+bun run build && go run main.go
+```
+
+3. Open http://localhost:8080 — ASR and TTS both use sherpa-onnx (no mocks).
+
+---
+
 ## microphone realtime ASR
 ./sherpa-onnx-microphone \
   --tokens=./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tokens.txt \

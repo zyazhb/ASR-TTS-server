@@ -1,0 +1,9 @@
+{
+  "name": "sherpa-onnx-server-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build demo/app.ts --outfile=demo/app.js",
+    "dev": "bun run build"
+  }
+}
