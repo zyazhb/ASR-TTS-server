@@ -1,18 +1,28 @@
 package main
 
 import (
+	"context"
+	_ "embed"
 	"encoding/binary"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+//go:embed bin/sherpa-onnx-offline-tts
+var embeddedTTS []byte
+
+//go:embed bin/sherpa-onnx-online-websocket-server
+var embeddedASR []byte
 
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -23,20 +33,88 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	sherpaTTSBinary = "./sherpa-onnx-offline-tts"
-	matchaDir       = "./matcha-icefall-zh-en"
+	matchaDir   = "./matcha-icefall-zh-en"
+	asrModelDir = "./sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20"
+)
+
+var (
+	extractedTTS string
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Extract and start sherpa-onnx-online-websocket-server
+	asrPath, err := extractBinary("sherpa-asr-", embeddedASR)
+	if err != nil {
+		log.Fatal("extract ASR binary:", err)
+	}
+	defer os.Remove(asrPath)
+
+	asrCmd := exec.CommandContext(ctx, asrPath,
+		"--port=6006",
+		"--tokens="+filepath.Join(asrModelDir, "tokens.txt"),
+		"--encoder="+filepath.Join(asrModelDir, "encoder-epoch-99-avg-1.onnx"),
+		"--decoder="+filepath.Join(asrModelDir, "decoder-epoch-99-avg-1.onnx"),
+		"--joiner="+filepath.Join(asrModelDir, "joiner-epoch-99-avg-1.onnx"),
+		"--num-threads=4",
+	)
+	asrCmd.Dir = "."
+	asrCmd.Stdout = os.Stdout
+	asrCmd.Stderr = os.Stderr
+	if err := asrCmd.Start(); err != nil {
+		log.Fatal("start ASR server:", err)
+	}
+	defer asrCmd.Process.Kill()
+
+	// Wait for ASR server to listen
+	time.Sleep(1 * time.Second)
+
+	// Extract TTS binary for later use
+	ttsPath, err := extractBinary("sherpa-tts-", embeddedTTS)
+	if err != nil {
+		log.Fatal("extract TTS binary:", err)
+	}
+	extractedTTS = ttsPath
+	defer os.Remove(extractedTTS)
+
 	http.HandleFunc("/asr", handleASR)
 	http.HandleFunc("/tts", handleTTS)
-	// Serve demo static files (index.html, app.js)
 	http.Handle("/", http.FileServer(http.Dir("./demo")))
 
 	log.Println("Server listening on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatal(err)
+	server := &http.Server{Addr: ":8080"}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	<-ctx.Done()
+	server.Shutdown(context.Background())
+}
+
+func extractBinary(prefix string, data []byte) (string, error) {
+	tmp, err := os.CreateTemp("", prefix+"*.bin")
+	if err != nil {
+		return "", err
 	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return "", err
+	}
+	if err := tmp.Chmod(0755); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return "", err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmp.Name())
+		return "", err
+	}
+	return tmp.Name(), nil
 }
 
 const sherpaASRAddr = "127.0.0.1:6006"
@@ -142,7 +220,7 @@ func runSherpaTTS(text string) ([]byte, error) {
 	tmp.Close()
 	defer os.Remove(tmpPath)
 
-	cmd := exec.Command(sherpaTTSBinary,
+	cmd := exec.Command(extractedTTS,
 		"--matcha-acoustic-model="+filepath.Join(matchaDir, "model-steps-3.onnx"),
 		"--matcha-vocoder="+filepath.Join(matchaDir, "vocos-16khz-univ.onnx"),
 		"--matcha-lexicon="+filepath.Join(matchaDir, "lexicon.txt"),
