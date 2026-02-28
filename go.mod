@@ -1,5 +1,5 @@
 module sherpa-onnx-server
 
-go 1.21
+go 1.26.0
 
 require github.com/gorilla/websocket v1.5.3
